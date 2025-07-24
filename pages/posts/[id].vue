@@ -1,5 +1,5 @@
 <template>
-  <div v-if="loading" class="text-center py-8">
+  <div v-if="loading || !currentPost" class="text-center py-8">
     <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
     <p class="mt-4 text-gray-600">로딩 중...</p>
   </div>
@@ -9,7 +9,7 @@
     <NuxtLink to="/" class="btn-primary">목록으로 돌아가기</NuxtLink>
   </div>
 
-  <div v-else-if="currentPost">
+  <div v-else-if="currentPost && currentPost.post">
     <!-- 게시글 내용 -->
     <article class="card mb-8">
       <header class="mb-6">
@@ -93,8 +93,12 @@ const { currentPost, loading, error } = storeToRefs(postStore)
 // 게시글 ID 가져오기
 const postId = parseInt(route.params.id)
 
-// 게시글 데이터 로드
-await postStore.fetchPostById(postId)
+// 게시글 데이터 로드 (try-catch로 에러 처리)
+try {
+  await postStore.fetchPostById(postId)
+} catch (err) {
+  console.error('Failed to fetch post:', err)
+}
 
 // 게시글 삭제
 const handleDelete = async () => {
@@ -109,6 +113,7 @@ const handleDelete = async () => {
 }
 
 const formatDate = (dateString) => {
+  if (!dateString) return ''
   return new Date(dateString).toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'long',
@@ -118,13 +123,23 @@ const formatDate = (dateString) => {
   })
 }
 
-// SEO 메타데이터
+// SEO 메타데이터 (안전한 접근)
 useHead({
-  title: () => currentPost.value?.post?.title || '게시글',
+  title: computed(() => {
+    if (currentPost.value?.post?.title) {
+      return currentPost.value.post.title
+    }
+    return '게시글'
+  }),
   meta: [
     {
       name: 'description',
-      content: () => currentPost.value?.post?.content?.substring(0, 150) || ''
+      content: computed(() => {
+        if (currentPost.value?.post?.content) {
+          return currentPost.value.post.content.substring(0, 150)
+        }
+        return ''
+      })
     }
   ]
 })

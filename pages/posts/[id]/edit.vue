@@ -9,7 +9,7 @@
     <NuxtLink to="/" class="btn-primary">목록으로 돌아가기</NuxtLink>
   </div>
 
-  <div v-else-if="currentPost">
+  <div v-else-if="currentPost && currentPost.post">
     <div class="mb-6">
       <h1 class="text-2xl font-bold text-gray-900">게시글 수정</h1>
     </div>
@@ -76,13 +76,28 @@ const { currentPost, loading, error } = storeToRefs(postStore)
 
 const postId = parseInt(route.params.id)
 
-// 게시글 데이터 로드
-await postStore.fetchPostById(postId)
+// 게시글 데이터 로드 (try-catch로 에러 처리)
+try {
+  await postStore.fetchPostById(postId)
+} catch (err) {
+  console.error('Failed to fetch post:', err)
+}
 
+// 폼 데이터 초기화 (안전한 접근)
 const form = ref({
-  title: currentPost.value?.post?.title || '',
-  content: currentPost.value?.post?.content || ''
+  title: '',
+  content: ''
 })
+
+// currentPost가 로드된 후 폼 데이터 설정
+watch(currentPost, (newPost) => {
+  if (newPost?.post) {
+    form.value = {
+      title: newPost.post.title || '',
+      content: newPost.post.content || ''
+    }
+  }
+}, { immediate: true })
 
 const handleSubmit = async () => {
   try {
@@ -94,6 +109,7 @@ const handleSubmit = async () => {
 }
 
 const formatDate = (dateString) => {
+  if (!dateString) return ''
   return new Date(dateString).toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'long',
@@ -103,11 +119,16 @@ const formatDate = (dateString) => {
   })
 }
 
-// SEO 메타데이터
+// SEO 메타데이터 (안전한 접근)
 useHead({
-  title: () => `게시글 수정 - ${currentPost.value?.post?.title || ''}`,
+  title: computed(() => {
+    if (currentPost.value?.post?.title) {
+      return `게시글 수정 - ${currentPost.value.post.title}`
+    }
+    return '게시글 수정'
+  }),
   meta: [
-    { name: 'description', content: '게시글을 수정합니다.' }
+    {name: 'description', content: '게시글을 수정합니다.'}
   ]
 })
 </script>
