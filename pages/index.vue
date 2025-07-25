@@ -96,6 +96,7 @@
 </template>
 
 <script setup>
+const modalStore = useModalStore()
 const postStore = usePostStore()
 const { posts, loading, error, pagination } = storeToRefs(postStore)
 
@@ -134,7 +135,7 @@ const goToPage = async (page) => {
 
 // 게시글 삭제
 const handleDeletePost = async (postId) => {
-  if (confirm('정말 삭제하시겠습니까?')) {
+  if (await modalStore.showConfirm('정말 삭제하시겠습니까?')) {
     try {
       await postStore.deletePost(postId)
       // 현재 페이지에 게시글이 없으면 이전 페이지로
@@ -143,7 +144,7 @@ const handleDeletePost = async (postId) => {
         await goToPage(currentPage.value)
       }
     } catch (error) {
-      alert('게시글 삭제에 실패했습니다.')
+      await modalStore.showError('게시글 삭제에 실패했습니다.')
     }
   }
 }

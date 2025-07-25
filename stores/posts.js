@@ -13,51 +13,98 @@ export const usePostStore = defineStore('posts', () => {
         totalElements: 0
     })
 
-    // Actions
-    const fetchPosts = async (page = 0, size = 10) => {
+    const fetchPostById = async (id) => {
+        if (!id || isNaN(id)) {
+            error.value = '잘못된 게시글 ID입니다.'
+            return
+        }
+
         loading.value = true
         error.value = null
+        currentPost.value = null
 
         try {
-            const response = await api.posts.getAll({ page, size })
-            posts.value = response.content
-            pagination.value = {
-                page: response.number,
-                size: response.size,
-                totalPages: response.totalPages,
-                totalElements: response.totalElements
+            console.log('Fetching post by ID:', id)
+            const response = await api.posts.getById(id)
+            console.log('API response:', response)
+
+            if (!response) {
+                throw new Error('응답이 비어있습니다.')
             }
+
+            // 백엔드 응답 구조에 맞게 처리
+            // { posts: {...}, commentCount: 0, fileCount: 0 }
+            const postData = {
+                post: response.posts,  // posts 필드를 post로 매핑
+                commentCount: response.commentCount || 0,
+                fileCount: response.fileCount || 0,
+                comments: response.comments || [],
+                files: response.files || []
+            }
+
+            console.log('Processed post data:', postData)
+            currentPost.value = postData
+
         } catch (err) {
-            error.value = err.message
+            console.error('Error fetching post:', err)
+
+            if (err.response?.status === 404) {
+                error.value = '게시글을 찾을 수 없습니다.'
+            } else if (err.response?.status === 500) {
+                error.value = '서버 오류가 발생했습니다.'
+            } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+                error.value = '서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.'
+            } else {
+                error.value = err.message || '게시글을 불러오는데 실패했습니다.'
+            }
         } finally {
             loading.value = false
         }
     }
 
-    const fetchPostById = async (id) => {
+    const fetchPosts = async (page = 0, size = 10) => {
         loading.value = true
         error.value = null
 
         try {
-            const response = await api.posts.getById(id)
-            currentPost.value = response
+            console.log('Fetching posts...', { page, size })
+            const response = await api.posts.getAll({ page, size })
+            console.log('Posts response:', response)
+
+            posts.value = response.content || []
+            pagination.value = {
+                page: response.number || 0,
+                size: response.size || size,
+                totalPages: response.totalPages || 0,
+                totalElements: response.totalElements || 0
+            }
         } catch (err) {
-            error.value = err.message
+            console.error('Error fetching posts:', err)
+            error.value = err.message || '게시글을 불러오는데 실패했습니다.'
         } finally {
             loading.value = false
         }
     }
 
     const createPost = async (postData) => {
+        if (!postData.title || !postData.content || !postData.author) {
+            throw new Error('모든 필드를 입력해주세요.')
+        }
+
         loading.value = true
         error.value = null
 
         try {
+            console.log('Creating post:', postData)
             const newPost = await api.posts.create(postData)
+            console.log('Created post:', newPost)
+
+            // 목록 맨 앞에 추가
             posts.value.unshift(newPost)
             return newPost
         } catch (err) {
-            error.value = err.message
+            console.error('Error creating post:', err)
+            error.value = err.message || '게시글 작성에 실패했습니다.'
             throw err
         } finally {
             loading.value = false
@@ -65,19 +112,36 @@ export const usePostStore = defineStore('posts', () => {
     }
 
     const updatePost = async (id, postData) => {
+        if (!id || !postData.title || !postData.content) {
+            throw new Error('필수 정보가 누락되었습니다.')
+        }
+
         loading.value = true
         error.value = null
 
         try {
+            console.log('Updating post:', id, postData)
             const updatedPost = await api.posts.update(id, postData)
+            console.log('Updated post:', updatedPost)
+
+            // 목록에서 해당 게시글 업데이트
             const index = posts.value.findIndex(p => p.id === id)
             if (index !== -1) {
                 posts.value[index] = updatedPost
             }
-            currentPost.value = updatedPost
+
+            // 현재 게시글이 업데이트된 게시글이라면 갱신
+            if (currentPost.value?.post?.id === id) {
+                currentPost.value = {
+                    ...currentPost.value,
+                    post: updatedPost
+                }
+            }
+
             return updatedPost
         } catch (err) {
-            error.value = err.message
+            console.error('Error updating post:', err)
+            error.value = err.message || '게시글 수정에 실패했습니다.'
             throw err
         } finally {
             loading.value = false
@@ -85,14 +149,28 @@ export const usePostStore = defineStore('posts', () => {
     }
 
     const deletePost = async (id) => {
+        if (!id) {
+            throw new Error('게시글 ID가 필요합니다.')
+        }
+
         loading.value = true
         error.value = null
 
         try {
+            console.log('Deleting post:', id)
             await api.posts.delete(id)
+            console.log('Post deleted successfully')
+
+            // 목록에서 제거
             posts.value = posts.value.filter(p => p.id !== id)
+
+            // 현재 게시글이 삭제된 게시글이라면 초기화
+            if (currentPost.value?.post?.id === id) {
+                currentPost.value = null
+            }
         } catch (err) {
-            error.value = err.message
+            console.error('Error deleting post:', err)
+            error.value = err.message || '게시글 삭제에 실패했습니다.'
             throw err
         } finally {
             loading.value = false
@@ -104,19 +182,33 @@ export const usePostStore = defineStore('posts', () => {
         error.value = null
 
         try {
+            console.log('Searching posts:', searchParams, { page, size })
             const response = await api.posts.search({ ...searchParams, page, size })
-            posts.value = response.content
+            console.log('Search response:', response)
+
+            posts.value = response.content || []
             pagination.value = {
-                page: response.number,
-                size: response.size,
-                totalPages: response.totalPages,
-                totalElements: response.totalElements
+                page: response.number || 0,
+                size: response.size || size,
+                totalPages: response.totalPages || 0,
+                totalElements: response.totalElements || 0
             }
         } catch (err) {
-            error.value = err.message
+            console.error('Error searching posts:', err)
+            error.value = err.message || '검색에 실패했습니다.'
         } finally {
             loading.value = false
         }
+    }
+
+    // 상태 초기화 함수
+    const clearCurrentPost = () => {
+        currentPost.value = null
+        error.value = null
+    }
+
+    const clearError = () => {
+        error.value = null
     }
 
     return {
@@ -133,6 +225,8 @@ export const usePostStore = defineStore('posts', () => {
         createPost,
         updatePost,
         deletePost,
-        searchPosts
+        searchPosts,
+        clearCurrentPost,
+        clearError
     }
 })

@@ -105,6 +105,7 @@ const props = defineProps({
   }
 })
 
+const modalStore = useModalStore()
 const commentStore = useCommentStore()
 const { comments, loading } = storeToRefs(commentStore)
 
@@ -129,7 +130,7 @@ const submitComment = async () => {
 
     newComment.value = { author: '', content: '' }
   } catch (error) {
-    alert('댓글 작성에 실패했습니다.')
+    await modalStore.showError('댓글 작성에 실패했습니다.')
   }
 }
 
@@ -145,7 +146,7 @@ const updateComment = async (commentId) => {
     await commentStore.updateComment(commentId, editingContent.value)
     cancelEdit()
   } catch (error) {
-    alert('댓글 수정에 실패했습니다.')
+    await modalStore.showError('댓글 수정에 실패했습니다.')
   }
 }
 
@@ -157,11 +158,11 @@ const cancelEdit = () => {
 
 // 댓글 삭제
 const deleteComment = async (commentId) => {
-  if (confirm('정말 삭제하시겠습니까?')) {
+  if (await modalStore.showConfirm('정말 삭제하시겠습니까?')) {
     try {
       await commentStore.deleteComment(commentId)
     } catch (error) {
-      alert('댓글 삭제에 실패했습니다.')
+      await modalStore.showError('댓글 삭제에 실패했습니다.')
     }
   }
 }

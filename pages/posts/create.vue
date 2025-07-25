@@ -69,6 +69,7 @@
 
 <script setup>
 const router = useRouter()
+const modalStore = useModalStore()
 const postStore = usePostStore()
 const { loading } = storeToRefs(postStore)
 
@@ -83,7 +84,7 @@ const handleSubmit = async () => {
     const newPost = await postStore.createPost(form.value)
     await router.push(`/posts/${newPost.id}`)
   } catch (error) {
-    alert('게시글 작성에 실패했습니다.')
+    await modalStore.showError('게시글 작성에 실패했습니다.')
   }
 }
 

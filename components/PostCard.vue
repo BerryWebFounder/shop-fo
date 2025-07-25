@@ -21,15 +21,15 @@
     <div class="flex justify-between items-center text-sm text-gray-500">
       <div class="flex items-center space-x-4">
         <span class="flex items-center">
-          <Icon name="user" class="w-4 h-4 mr-1" />
+          <span class="mr-1">👤</span>
           {{ post.author }}
         </span>
         <span class="flex items-center" v-if="post.comments?.length">
-          <Icon name="message" class="w-4 h-4 mr-1" />
+          <span class="mr-1">💬</span>
           {{ post.comments.length }}
         </span>
         <span class="flex items-center" v-if="post.files?.length">
-          <Icon name="attachment" class="w-4 h-4 mr-1" />
+          <span class="mr-1">📎</span>
           {{ post.files.length }}
         </span>
       </div>
@@ -53,22 +53,44 @@
 </template>
 
 <script setup>
-defineProps({
+const props = defineProps({
   post: {
     type: Object,
     required: true
   }
 })
 
-defineEmits(['delete'])
+const emit = defineEmits(['delete'])
 
 const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  if (!dateString) return ''
+  try {
+    return new Date(dateString).toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch (error) {
+    console.error('Date formatting error:', error)
+    return dateString
+  }
 }
 </script>
+
+<style scoped>
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>

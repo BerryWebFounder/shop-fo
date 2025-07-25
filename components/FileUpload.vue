@@ -99,6 +99,7 @@ const props = defineProps({
   }
 })
 
+const modalStore = useModalStore()
 const fileStore = useFileStore()
 const { files, loading } = storeToRefs(fileStore)
 
@@ -130,17 +131,17 @@ const uploadFiles = async () => {
     const fileInput = document.querySelector('input[type="file"]')
     if (fileInput) fileInput.value = ''
   } catch (error) {
-    alert('파일 업로드에 실패했습니다.')
+    await modalStore.showError('파일 업로드에 실패했습니다.')
   }
 }
 
 // 파일 삭제
 const deleteFile = async (fileId) => {
-  if (confirm('정말 삭제하시겠습니까?')) {
+  if (await modalStore.showConfirm('정말 삭제하시겠습니까?')) {
     try {
       await fileStore.deleteFile(fileId, props.postId)
     } catch (error) {
-      alert('파일 삭제에 실패했습니다.')
+      await modalStore.showError('파일 삭제에 실패했습니다.')
     }
   }
 }
