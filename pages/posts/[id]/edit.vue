@@ -62,6 +62,11 @@
           </div>
         </div>
 
+        <!-- 첨부파일 -->
+        <div class="card mb-8">
+          <FileUpload :post-id="postId" />
+        </div>
+
         <div class="flex justify-end space-x-4">
           <NuxtLink :to="`/posts/${postId}`" class="btn-secondary">
             취소

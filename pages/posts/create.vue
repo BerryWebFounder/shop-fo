@@ -52,14 +52,9 @@
         </div>
       </div>
 
-      <!-- 파일 첨부 영역 -->
-      <div class="card">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">파일 첨부</h3>
-        <FileAttachment
-            ref="fileAttachment"
-            @files-selected="handleFilesSelected"
-            @files-removed="handleFilesRemoved"
-        />
+      <!-- 첨부파일 -->
+      <div class="card mb-8">
+        <FileUpload :post-id="postId" />
       </div>
 
       <!-- 작성 완료 버튼 -->

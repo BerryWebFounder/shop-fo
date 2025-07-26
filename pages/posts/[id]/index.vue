@@ -68,11 +68,6 @@
         </div>
       </article>
 
-      <!-- 첨부파일 -->
-      <div class="card mb-8">
-        <FileUpload :post-id="postId" />
-      </div>
-
       <!-- 댓글 -->
       <div class="card mb-8">
         <CommentList :post-id="postId" />
