@@ -33,9 +33,8 @@ export const usePostStore = defineStore('posts', () => {
             }
 
             // 백엔드 응답 구조에 맞게 처리
-            // { posts: {...}, commentCount: 0, fileCount: 0 }
             const postData = {
-                post: response.posts,  // posts 필드를 post로 매핑
+                post: response.posts,
                 commentCount: response.commentCount || 0,
                 fileCount: response.fileCount || 0,
                 comments: response.comments || [],
@@ -177,13 +176,24 @@ export const usePostStore = defineStore('posts', () => {
         }
     }
 
+    // 개선된 검색 함수
     const searchPosts = async (searchParams, page = 0, size = 10) => {
         loading.value = true
         error.value = null
 
         try {
             console.log('Searching posts:', searchParams, { page, size })
-            const response = await api.posts.search({ ...searchParams, page, size })
+
+            // 페이지네이션 파라미터 추가
+            const finalParams = {
+                ...searchParams,
+                page,
+                size
+            }
+
+            console.log('Final search params:', finalParams)
+
+            const response = await api.posts.search(finalParams)
             console.log('Search response:', response)
 
             posts.value = response.content || []
@@ -193,12 +203,43 @@ export const usePostStore = defineStore('posts', () => {
                 totalPages: response.totalPages || 0,
                 totalElements: response.totalElements || 0
             }
+
+            // 검색 결과 로깅
+            console.log(`검색 완료: ${posts.value.length}개 결과, 총 ${pagination.value.totalElements}개`)
+
         } catch (err) {
             console.error('Error searching posts:', err)
             error.value = err.message || '검색에 실패했습니다.'
+
+            // 검색 실패 시 빈 결과로 설정
+            posts.value = []
+            pagination.value = {
+                page: 0,
+                size: size,
+                totalPages: 0,
+                totalElements: 0
+            }
         } finally {
             loading.value = false
         }
+    }
+
+    // 작성자별 검색 (특별한 처리가 필요한 경우)
+    const searchPostsByAuthor = async (author, page = 0, size = 10) => {
+        console.log('Searching posts by author:', author)
+        return await searchPosts({ author }, page, size)
+    }
+
+    // 제목별 검색
+    const searchPostsByTitle = async (title, page = 0, size = 10) => {
+        console.log('Searching posts by title:', title)
+        return await searchPosts({ title }, page, size)
+    }
+
+    // 내용별 검색
+    const searchPostsByContent = async (content, page = 0, size = 10) => {
+        console.log('Searching posts by content:', content)
+        return await searchPosts({ content }, page, size)
     }
 
     // 상태 초기화 함수
@@ -226,6 +267,9 @@ export const usePostStore = defineStore('posts', () => {
         updatePost,
         deletePost,
         searchPosts,
+        searchPostsByAuthor,
+        searchPostsByTitle,
+        searchPostsByContent,
         clearCurrentPost,
         clearError
     }

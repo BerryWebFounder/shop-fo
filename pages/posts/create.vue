@@ -5,6 +5,7 @@
     </div>
 
     <form @submit.prevent="handleSubmit" class="space-y-6">
+      <!-- 기본 정보 입력 -->
       <div class="card">
         <div class="space-y-4">
           <div>
@@ -51,6 +52,17 @@
         </div>
       </div>
 
+      <!-- 파일 첨부 영역 -->
+      <div class="card">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">파일 첨부</h3>
+        <FileAttachment
+            ref="fileAttachment"
+            @files-selected="handleFilesSelected"
+            @files-removed="handleFilesRemoved"
+        />
+      </div>
+
+      <!-- 작성 완료 버튼 -->
       <div class="flex justify-end space-x-4">
         <NuxtLink to="/" class="btn-secondary">
           취소
@@ -58,9 +70,9 @@
         <button
             type="submit"
             class="btn-primary"
-            :disabled="loading"
+            :disabled="loading || isSubmitting"
         >
-          {{ loading ? '작성 중...' : '게시글 작성' }}
+          {{ isSubmitting ? '작성 중...' : '게시글 작성' }}
         </button>
       </div>
     </form>
@@ -79,12 +91,60 @@ const form = ref({
   author: ''
 })
 
+const isSubmitting = ref(false)
+const selectedFiles = ref([])
+
+// 파일 선택 처리
+const handleFilesSelected = (files) => {
+  selectedFiles.value = [...selectedFiles.value, ...files]
+}
+
+// 파일 제거 처리
+const handleFilesRemoved = (files) => {
+  selectedFiles.value = selectedFiles.value.filter(
+      selected => !files.some(removed =>
+          removed.name === selected.name && removed.size === selected.size
+      )
+  )
+}
+
+// 게시글 작성 처리
 const handleSubmit = async () => {
+  if (isSubmitting.value) return
+
   try {
+    isSubmitting.value = true
+
+    // 1. 게시글 생성
     const newPost = await postStore.createPost(form.value)
+
+    // 2. 파일이 있으면 업로드
+    if (selectedFiles.value.length > 0) {
+      const fileStore = useFileStore()
+
+      try {
+        await fileStore.uploadFiles(newPost.id, selectedFiles.value)
+        await modalStore.showSuccess(
+            `게시글이 작성되었습니다. (첨부파일 ${selectedFiles.value.length}개 포함)`
+        )
+      } catch (fileError) {
+        console.error('File upload error:', fileError)
+        await modalStore.showWarning(
+            '게시글은 작성되었지만 일부 파일 업로드에 실패했습니다.\n게시글에서 다시 파일을 업로드해주세요.'
+        )
+      }
+    } else {
+      await modalStore.showSuccess('게시글이 작성되었습니다.')
+    }
+
+    // 3. 상세 페이지로 이동
     await router.push(`/posts/${newPost.id}`)
+
   } catch (error) {
+    console.error('Post creation error:', error)
     await modalStore.showError('게시글 작성에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
   }
 }
 

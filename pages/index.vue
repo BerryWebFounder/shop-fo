@@ -1,30 +1,49 @@
 <template>
   <div>
-    <!-- 검색 바 -->
+    <!-- 개선된 검색 바 -->
     <div class="card mb-6">
-      <div class="flex flex-col sm:flex-row gap-4">
-        <div class="flex-1">
-          <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="제목, 내용, 작성자로 검색..."
-              class="form-input"
-              @keyup.enter="handleSearch"
-          />
+      <div class="space-y-4">
+        <!-- 검색 필드 선택 -->
+        <div class="flex flex-col sm:flex-row gap-4">
+          <div class="sm:w-1/4">
+            <select v-model="searchType" class="form-input">
+              <option value="all">전체</option>
+              <option value="title">제목</option>
+              <option value="content">내용</option>
+              <option value="author">작성자</option>
+            </select>
+          </div>
+          <div class="flex-1">
+            <input
+                v-model="searchQuery"
+                type="text"
+                :placeholder="getSearchPlaceholder()"
+                class="form-input"
+                @keyup.enter="handleSearch"
+            />
+          </div>
+          <div class="flex space-x-2">
+            <button
+                @click="handleSearch"
+                class="btn-primary"
+                :disabled="loading"
+            >
+              검색
+            </button>
+            <button
+                @click="resetSearch"
+                class="btn-secondary"
+            >
+              초기화
+            </button>
+          </div>
         </div>
-        <div class="flex space-x-2">
-          <button
-              @click="handleSearch"
-              class="btn-primary"
-          >
-            검색
-          </button>
-          <button
-              @click="resetSearch"
-              class="btn-secondary"
-          >
-            초기화
-          </button>
+
+        <!-- 현재 검색 조건 표시 -->
+        <div v-if="currentSearchInfo" class="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+          <span class="font-medium">검색 결과:</span>
+          {{ currentSearchInfo }}
+          <span class="ml-2 text-blue-600">({{ pagination.totalElements }}개)</span>
         </div>
       </div>
     </div>
@@ -51,10 +70,16 @@
       </div>
 
       <div v-else class="card text-center py-12">
-        <p class="text-gray-500 mb-4">게시글이 없습니다.</p>
-        <NuxtLink to="/posts/create" class="btn-primary">
-          첫 게시글 작성하기
-        </NuxtLink>
+        <div v-if="isSearching">
+          <p class="text-gray-500 mb-4">검색 결과가 없습니다.</p>
+          <button @click="resetSearch" class="btn-secondary mb-2">전체 목록 보기</button>
+        </div>
+        <div v-else>
+          <p class="text-gray-500 mb-4">게시글이 없습니다.</p>
+          <NuxtLink to="/posts/create" class="btn-primary">
+            첫 게시글 작성하기
+          </NuxtLink>
+        </div>
       </div>
 
       <!-- 페이지네이션 -->
@@ -100,34 +125,91 @@ const modalStore = useModalStore()
 const postStore = usePostStore()
 const { posts, loading, error, pagination } = storeToRefs(postStore)
 
+// 검색 관련 상태
 const searchQuery = ref('')
+const searchType = ref('all')
 const currentPage = ref(0)
+const isSearching = ref(false)
+const currentSearchInfo = ref('')
 
 // 초기 데이터 로드
 await postStore.fetchPosts(currentPage.value)
 
-// 검색 처리
-const handleSearch = async () => {
-  if (searchQuery.value.trim()) {
-    await postStore.searchPosts({ keyword: searchQuery.value.trim() }, 0)
-  } else {
-    await postStore.fetchPosts(0)
+// 검색 placeholder 동적 변경
+const getSearchPlaceholder = () => {
+  const placeholders = {
+    all: '제목, 내용, 작성자로 검색...',
+    title: '제목으로 검색...',
+    content: '내용으로 검색...',
+    author: '작성자명으로 검색...'
   }
-  currentPage.value = 0
+  return placeholders[searchType.value]
+}
+
+// 개선된 검색 처리
+const handleSearch = async () => {
+  const query = searchQuery.value.trim()
+
+  if (!query) {
+    await resetSearch()
+    return
+  }
+
+  try {
+    // 검색 파라미터 구성
+    const searchParams = {}
+
+    if (searchType.value === 'all') {
+      // 전체 검색 - 기존 방식 유지
+      searchParams.keyword = query
+    } else {
+      // 특정 필드 검색
+      searchParams[searchType.value] = query
+    }
+
+    console.log('Search params:', searchParams)
+
+    await postStore.searchPosts(searchParams, 0)
+    currentPage.value = 0
+    isSearching.value = true
+
+    // 검색 정보 업데이트
+    const typeNames = {
+      all: '전체',
+      title: '제목',
+      content: '내용',
+      author: '작성자'
+    }
+    currentSearchInfo.value = `${typeNames[searchType.value]}에서 "${query}" 검색`
+
+  } catch (error) {
+    console.error('Search error:', error)
+    await modalStore.showError('검색 중 오류가 발생했습니다.')
+  }
 }
 
 // 검색 초기화
 const resetSearch = async () => {
   searchQuery.value = ''
+  searchType.value = 'all'
   currentPage.value = 0
+  isSearching.value = false
+  currentSearchInfo.value = ''
   await postStore.fetchPosts(0)
 }
 
 // 페이지 이동
 const goToPage = async (page) => {
   currentPage.value = page
-  if (searchQuery.value.trim()) {
-    await postStore.searchPosts({ keyword: searchQuery.value.trim() }, page)
+
+  if (isSearching.value && searchQuery.value.trim()) {
+    const searchParams = {}
+    if (searchType.value === 'all') {
+      searchParams.keyword = searchQuery.value.trim()
+    } else {
+      searchParams[searchType.value] = searchQuery.value.trim()
+    }
+    await postStore.searchPosts(searchParams, page)
   } else {
     await postStore.fetchPosts(page)
   }
