@@ -105,15 +105,19 @@
         </div>
       </article>
 
-      <!-- 첨부파일 섹션 -->
+      <!-- 첨부파일 섹션 (에러 처리 강화) -->
       <div v-if="hasFiles" class="card mb-8">
         <Suspense>
-          <FileListReadonly
-              :post-id="postId"
-              :can-delete="false"
-              @file-deleted="handleFileDeleted"
-              @file-previewed="handleFilePreview"
-          />
+          <template #default>
+            <ClientOnly fallback-tag="div" fallback="파일 목록을 불러오는 중...">
+              <FileListReadonly
+                  :post-id="postId"
+                  :can-delete="false"
+                  @file-deleted="handleFileDeleted"
+                  @file-previewed="handleFilePreview"
+              />
+            </ClientOnly>
+          </template>
           <template #fallback>
             <div class="text-center py-4">
               <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
@@ -231,33 +235,56 @@ const { data: currentPost, pending, error, refresh } = await useLazyAsyncData(
 // Store의 상태도 함께 사용
 const { loading } = storeToRefs(postStore)
 
-// 파일 store 사용
-const fileStore = useFileStore()
-const { files: attachedFiles } = storeToRefs(fileStore)
+// 파일 store 사용 (조건부 초기화)
+let fileStore = null
+let attachedFiles = ref([])
 
-// 첨부파일 표시 여부
+try {
+  fileStore = useFileStore()
+  const storeRefs = storeToRefs(fileStore)
+  attachedFiles = storeRefs.files
+} catch (error) {
+  console.warn('FileStore initialization failed:', error)
+  // 파일 store 실패 시에도 페이지는 정상 작동하도록 처리
+}
+
+// 첨부파일 표시 여부 (안전하게 처리)
 const hasFiles = computed(() => {
-  // 1. 게시글 데이터에서 파일 개수 확인
-  const fileCountFromPost = currentPost.value?.fileCount > 0
+  try {
+    // 1. 게시글 데이터에서 파일 개수 확인
+    const fileCountFromPost = currentPost.value?.fileCount > 0
 
-  // 2. 파일 store에서 실제 파일 확인
-  const hasActualFiles = attachedFiles.value && attachedFiles.value.length > 0
+    // 2. 파일 store에서 실제 파일 확인 (store가 있을 때만)
+    const hasActualFiles = attachedFiles.value && attachedFiles.value.length > 0
 
-  return fileCountFromPost || hasActualFiles
+    return fileCountFromPost || hasActualFiles
+  } catch (error) {
+    console.warn('Error checking file status:', error)
+    // 에러 발생 시 게시글 데이터의 파일 카운트만 사용
+    return currentPost.value?.fileCount > 0
+  }
 })
 
-// 파일 관련 이벤트 핸들러
+// 파일 관련 이벤트 핸들러 (안전하게 처리)
 const handleFileDeleted = (fileId) => {
   console.log('File deleted:', fileId)
-  // 파일이 삭제되면 게시글 정보도 업데이트
-  if (currentPost.value) {
-    currentPost.value.fileCount = Math.max(0, (currentPost.value.fileCount || 0) - 1)
+  try {
+    // 파일이 삭제되면 게시글 정보도 업데이트
+    if (currentPost.value) {
+      currentPost.value.fileCount = Math.max(0, (currentPost.value.fileCount || 0) - 1)
+    }
+  } catch (error) {
+    console.warn('Error handling file deletion:', error)
   }
 }
 
 const handleFilePreview = (file) => {
-  console.log('Preview file:', file.originalName)
-  previewingFile.value = file
+  try {
+    console.log('Preview file:', file.originalName)
+    previewingFile.value = file
+  } catch (error) {
+    console.warn('Error handling file preview:', error)
+  }
 }
 
 const closeFilePreview = () => {
@@ -322,19 +349,20 @@ watch(() => route.params.id, (newId, oldId) => {
   }
 })
 
-// 페이지 진입 시 파일 목록도 미리 로드
+// 페이지 진입 시 파일 목록 미리 로드 (안전하게 처리)
 onMounted(async () => {
   console.log('Component mounted')
   console.log('Current route:', route.fullPath)
   console.log('Post ID:', postId.value)
   console.log('Current post data:', currentPost.value)
 
-  // 파일 목록 미리 로드
-  if (postId.value) {
+  // 파일 목록 미리 로드 (fileStore가 있을 때만)
+  if (postId.value && fileStore) {
     try {
       await fileStore.fetchFilesByPostId(postId.value)
     } catch (error) {
       console.warn('Failed to preload files:', error)
+      // 파일 로딩 실패해도 페이지는 정상 작동
     }
   }
 })

@@ -52,72 +52,68 @@
         </div>
       </div>
 
-      <!-- 임시 첨부파일 섹션 (기존 파일 업로드 로직 단순화) -->
+      <!-- 첨부파일 관리 -->
       <div class="card">
-        <div class="mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">첨부파일</h3>
-          <p class="text-sm text-gray-500 mt-1">
-            게시글 저장 후 파일을 업로드할 수 있습니다.
-          </p>
-        </div>
-
-        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6">
-          <div class="text-center">
-            <input
-                ref="tempFileInput"
-                type="file"
-                multiple
-                @change="handleTempFileSelect"
-                class="hidden"
-            />
-
-            <div class="mb-4">
-              <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
+        <div class="space-y-4">
+          <div class="flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+              <Icon name="attachment" size="sm" class="mr-2" />
+              첨부파일 관리
+            </h3>
+            <div class="text-sm text-gray-500">
+                <span v-if="currentPost.fileCount > 0">
+                  현재 {{ currentPost.fileCount }}개 파일 첨부됨
+                </span>
+              <span v-else>
+                  첨부파일 없음
+                </span>
             </div>
-
-            <button
-                type="button"
-                @click="$refs.tempFileInput.click()"
-                class="btn-secondary"
-            >
-              파일 미리 선택
-            </button>
-
-            <p class="text-sm text-gray-500 mt-2">
-              게시글 저장 후 자동으로 업로드됩니다
-            </p>
           </div>
-        </div>
 
-        <!-- 임시 선택된 파일 목록 -->
-        <div v-if="tempFiles.length > 0" class="mt-4 space-y-2">
-          <h4 class="font-medium text-gray-900">선택된 파일 ({{ tempFiles.length }}개):</h4>
-          <div class="space-y-2 max-h-40 overflow-y-auto">
-            <div
-                v-for="(file, index) in tempFiles"
-                :key="`temp-${index}`"
-                class="flex justify-between items-center bg-gray-50 p-3 rounded border"
-            >
-              <div class="flex items-center space-x-3 flex-1 min-w-0">
-                <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
-                </svg>
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-medium text-gray-900 truncate">{{ file.name }}</p>
-                  <p class="text-xs text-gray-500">{{ formatFileSize(file.size) }}</p>
+          <!-- 파일 업로드 컴포넌트 (에러 처리 강화) -->
+          <Suspense>
+            <template #default>
+              <ClientOnly fallback-tag="div" fallback="파일 관리 시스템을 불러오는 중...">
+                <FileUpload
+                    v-if="fileStore"
+                    :post-id="postId"
+                    :max-files="20"
+                    :max-file-size="50 * 1024 * 1024"
+                    @files-uploaded="handleFilesUploaded"
+                    @file-deleted="handleFileDeleted"
+                />
+                <div v-else class="border-2 border-dashed border-gray-300 rounded-lg p-8">
+                  <div class="text-center text-gray-500">
+                    <Icon name="warning" size="lg" class="mx-auto mb-2" />
+                    <p>파일 업로드 기능을 사용할 수 없습니다.</p>
+                    <p class="text-sm">페이지를 새로고침 후 다시 시도해주세요.</p>
+                  </div>
+                </div>
+              </ClientOnly>
+            </template>
+            <template #fallback>
+              <div class="border-2 border-dashed border-gray-300 rounded-lg p-8">
+                <div class="text-center">
+                  <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p class="mt-2 text-sm text-gray-600">파일 관리 시스템 로딩 중...</p>
                 </div>
               </div>
-              <button
-                  type="button"
-                  @click="removeTempFile(index)"
-                  class="text-red-600 hover:text-red-800"
-              >
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
-              </button>
+            </template>
+          </Suspense>
+
+          <!-- 파일 관리 도움말 -->
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div class="flex">
+              <Icon name="info" size="sm" color="blue" class="mr-2 mt-0.5" />
+              <div class="text-sm text-blue-800">
+                <p class="font-medium mb-1">파일 업로드 안내</p>
+                <ul class="text-xs space-y-1">
+                  <li>• 최대 파일 크기: 50MB</li>
+                  <li>• 최대 파일 개수: 20개</li>
+                  <li>• 드래그 앤 드롭으로 여러 파일을 한번에 업로드할 수 있습니다</li>
+                  <li>• 이미지, 문서, 압축파일 등 대부분의 파일 형식을 지원합니다</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
