@@ -6,7 +6,7 @@
       <p class="mt-4 text-gray-600">로딩 중...</p>
     </div>
 
-    <!-- 에러 상태 -->
+    <!-- 에러 상태 (개선된 디버깅 정보) -->
     <div v-else-if="error" class="card text-center py-8">
       <div class="text-red-600 mb-4">
         <svg class="w-16 h-16 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
@@ -14,13 +14,23 @@
         </svg>
         <h3 class="text-lg font-semibold mb-2">오류가 발생했습니다</h3>
         <p class="mb-4">{{ error }}</p>
-        <div class="text-sm text-gray-500 mb-4">
-          <p>요청한 게시글 ID: {{ postId }}</p>
+
+        <!-- 디버깅 정보 -->
+        <div class="text-sm text-gray-500 mb-4 bg-gray-100 p-4 rounded">
+          <p><strong>디버깅 정보:</strong></p>
+          <p>게시글 ID: {{ postId }}</p>
           <p>현재 URL: {{ $route.fullPath }}</p>
+          <p>API 기본 URL: {{ config.public.apiBaseUrl }}</p>
+          <p>로딩 상태: {{ loading }}</p>
+          <p>데이터 상태: {{ currentPost ? '있음' : '없음' }}</p>
+          <p>마지막 시도: {{ lastAttemptTime }}</p>
         </div>
       </div>
+
       <div class="space-y-2">
         <button @click="retryFetch" class="btn-primary">다시 시도</button>
+        <br>
+        <button @click="tryAlternativeLoad" class="btn-secondary">대체 방법으로 로드</button>
         <br>
         <NuxtLink to="/" class="btn-secondary">목록으로 돌아가기</NuxtLink>
       </div>
@@ -34,8 +44,19 @@
         </svg>
         <h3 class="text-lg font-semibold mb-2">게시글을 찾을 수 없습니다</h3>
         <p class="mb-4">요청하신 게시글이 존재하지 않거나 삭제되었을 수 있습니다.</p>
+
+        <!-- 추가 진단 정보 -->
+        <div class="text-sm text-gray-400 mb-4">
+          <p>게시글 ID: {{ postId }}</p>
+          <p>{{ new Date().toLocaleString() }}</p>
+        </div>
       </div>
-      <NuxtLink to="/" class="btn-primary">목록으로 돌아가기</NuxtLink>
+
+      <div class="space-y-2">
+        <button @click="checkPostInList" class="btn-secondary">목록에서 게시글 확인</button>
+        <br>
+        <NuxtLink to="/" class="btn-primary">목록으로 돌아가기</NuxtLink>
+      </div>
     </div>
 
     <!-- 게시글 내용 -->
@@ -105,8 +126,8 @@
         </div>
       </article>
 
-      <!-- 첨부파일 섹션 (에러 처리 강화) -->
-      <div v-if="hasFiles" class="card mb-8">
+      <!-- 첨부파일 섹션 (조건부 렌더링 개선) -->
+      <div v-if="shouldShowFiles" class="card mb-8">
         <Suspense>
           <template #default>
             <ClientOnly fallback-tag="div" fallback="파일 목록을 불러오는 중...">
@@ -170,6 +191,7 @@
 <script setup>
 const route = useRoute()
 const router = useRouter()
+const config = useRuntimeConfig()
 
 // Store 초기화
 let modalStore, postStore
@@ -187,6 +209,7 @@ try {
 // 상태
 const deleting = ref(false)
 const previewingFile = ref(null)
+const lastAttemptTime = ref('')
 
 // 게시글 ID 추출 및 검증
 const postId = computed(() => {
@@ -203,26 +226,63 @@ const postId = computed(() => {
   return id
 })
 
-// 데이터 로딩
+// 파일 표시 여부 개선
+const shouldShowFiles = computed(() => {
+  // 1. 게시글 데이터에서 파일 개수 확인
+  const fileCountFromPost = currentPost.value?.fileCount > 0
+
+  // 2. 파일 개수가 있으면 표시
+  return fileCountFromPost
+})
+
+// 데이터 로딩 (개선된 에러 처리)
 console.log('Fetching post with ID:', postId.value)
 
 const { data: currentPost, pending, error, refresh } = await useLazyAsyncData(
     `post-${postId.value}`,
     async () => {
       try {
-        console.log('Starting to fetch post:', postId.value)
+        lastAttemptTime.value = new Date().toLocaleString()
+        console.log('=== Starting to fetch post ===')
+        console.log('Post ID:', postId.value)
+        console.log('API Base URL:', config.public.apiBaseUrl)
 
         if (!postStore) {
           throw new Error('Post store is not initialized')
         }
 
+        // 직접 API 호출로 테스트
+        console.log('Testing direct API call...')
+        const directResponse = await $fetch(`${config.public.apiBaseUrl}/posts/${postId.value}`)
+        console.log('Direct API response:', directResponse)
+
+        // Store를 통한 호출
+        console.log('Calling postStore.fetchPostById...')
         await postStore.fetchPostById(postId.value)
         const result = postStore.currentPost
 
         console.log('Post fetched successfully:', result)
+
+        if (!result || !result.post) {
+          console.error('Post data is null or invalid:', result)
+          throw new Error('게시글 데이터를 가져올 수 없습니다.')
+        }
+
         return result
       } catch (err) {
-        console.error('Error in useLazyAsyncData:', err)
+        console.error('=== Error in useLazyAsyncData ===')
+        console.error('Error type:', err.constructor.name)
+        console.error('Error message:', err.message)
+        console.error('Error details:', err)
+
+        if (err.status === 404 || err.statusCode === 404) {
+          throw new Error('게시글을 찾을 수 없습니다.')
+        } else if (err.status === 500 || err.statusCode === 500) {
+          throw new Error('서버 오류가 발생했습니다.')
+        } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+          throw new Error('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.')
+        }
+
         throw err
       }
     },
@@ -245,31 +305,12 @@ try {
   attachedFiles = storeRefs.files
 } catch (error) {
   console.warn('FileStore initialization failed:', error)
-  // 파일 store 실패 시에도 페이지는 정상 작동하도록 처리
 }
 
-// 첨부파일 표시 여부 (안전하게 처리)
-const hasFiles = computed(() => {
-  try {
-    // 1. 게시글 데이터에서 파일 개수 확인
-    const fileCountFromPost = currentPost.value?.fileCount > 0
-
-    // 2. 파일 store에서 실제 파일 확인 (store가 있을 때만)
-    const hasActualFiles = attachedFiles.value && attachedFiles.value.length > 0
-
-    return fileCountFromPost || hasActualFiles
-  } catch (error) {
-    console.warn('Error checking file status:', error)
-    // 에러 발생 시 게시글 데이터의 파일 카운트만 사용
-    return currentPost.value?.fileCount > 0
-  }
-})
-
-// 파일 관련 이벤트 핸들러 (안전하게 처리)
+// 파일 관련 이벤트 핸들러
 const handleFileDeleted = (fileId) => {
   console.log('File deleted:', fileId)
   try {
-    // 파일이 삭제되면 게시글 정보도 업데이트
     if (currentPost.value) {
       currentPost.value.fileCount = Math.max(0, (currentPost.value.fileCount || 0) - 1)
     }
@@ -295,6 +336,48 @@ const closeFilePreview = () => {
 const retryFetch = async () => {
   console.log('Retrying fetch...')
   await refresh()
+}
+
+// 대체 로드 방법
+const tryAlternativeLoad = async () => {
+  try {
+    console.log('Trying alternative load method...')
+
+    // 목록에서 해당 게시글을 찾아서 로드
+    await postStore.fetchPosts(0, 100) // 첫 100개 게시글 가져오기
+    const posts = postStore.posts
+    const foundPost = posts.find(p => p.id === postId.value)
+
+    if (foundPost) {
+      console.log('Found post in list:', foundPost)
+
+      // 기본 구조로 currentPost 설정
+      currentPost.value = {
+        post: foundPost,
+        commentCount: 0,
+        fileCount: 0,
+        comments: [],
+        files: []
+      }
+
+      modalStore.showSuccess('게시글을 불러왔습니다. (기본 정보만)')
+    } else {
+      throw new Error('목록에서도 게시글을 찾을 수 없습니다.')
+    }
+  } catch (err) {
+    console.error('Alternative load failed:', err)
+    modalStore.showError('대체 방법으로도 게시글을 불러올 수 없습니다.')
+  }
+}
+
+// 목록에서 게시글 확인
+const checkPostInList = async () => {
+  try {
+    console.log('Checking post in list...')
+    await router.push('/')
+  } catch (err) {
+    console.error('Navigation failed:', err)
+  }
 }
 
 // 게시글 삭제
@@ -351,18 +434,18 @@ watch(() => route.params.id, (newId, oldId) => {
 
 // 페이지 진입 시 파일 목록 미리 로드 (안전하게 처리)
 onMounted(async () => {
-  console.log('Component mounted')
+  console.log('=== Component mounted ===')
   console.log('Current route:', route.fullPath)
   console.log('Post ID:', postId.value)
   console.log('Current post data:', currentPost.value)
 
-  // 파일 목록 미리 로드 (fileStore가 있을 때만)
-  if (postId.value && fileStore) {
+  // 파일 목록 미리 로드 (fileStore가 있고 파일이 있을 때만)
+  if (postId.value && fileStore && shouldShowFiles.value) {
     try {
+      console.log('Preloading files for post:', postId.value)
       await fileStore.fetchFilesByPostId(postId.value)
     } catch (error) {
       console.warn('Failed to preload files:', error)
-      // 파일 로딩 실패해도 페이지는 정상 작동
     }
   }
 })

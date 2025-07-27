@@ -13,6 +13,8 @@ export const usePostStore = defineStore('posts', () => {
         totalElements: 0
     })
 
+    // stores/posts.js의 fetchPostById 함수 수정 버전
+
     const fetchPostById = async (id) => {
         if (!id || isNaN(id)) {
             error.value = '잘못된 게시글 ID입니다.'
@@ -24,28 +26,74 @@ export const usePostStore = defineStore('posts', () => {
         currentPost.value = null
 
         try {
-            console.log('Fetching post by ID:', id)
+            console.log('=== fetchPostById 시작 ===')
+            console.log('요청 ID:', id)
+            console.log('API 기본 URL:', useRuntimeConfig().public.apiBaseUrl)
+
+            // API 호출
             const response = await api.posts.getById(id)
-            console.log('API response:', response)
+            console.log('API 응답 원본:', response)
 
             if (!response) {
                 throw new Error('응답이 비어있습니다.')
             }
 
-            // 백엔드 응답 구조에 맞게 처리
-            const postData = {
-                post: response.posts,
-                commentCount: response.commentCount || 0,
-                fileCount: response.fileCount || 0,
-                comments: response.comments || [],
-                files: response.files || []
+            // 응답 구조 분석 및 처리
+            let postData = null
+
+            if (response.post || response.posts) {
+                // 래핑된 응답 구조
+                console.log('래핑된 응답 구조 감지')
+                postData = {
+                    post: response.post || response.posts,
+                    commentCount: response.commentCount || 0,
+                    fileCount: response.fileCount || 0,
+                    comments: response.comments || [],
+                    files: response.files || []
+                }
+            } else if (response.id) {
+                // 직접 게시글 객체 응답
+                console.log('직접 게시글 객체 응답 감지')
+                postData = {
+                    post: response,
+                    commentCount: 0,
+                    fileCount: 0,
+                    comments: [],
+                    files: []
+                }
+            } else if (response.data) {
+                // data 래핑 응답
+                console.log('data 래핑 응답 감지')
+                const data = response.data
+                postData = {
+                    post: data.post || data,
+                    commentCount: data.commentCount || 0,
+                    fileCount: data.fileCount || 0,
+                    comments: data.comments || [],
+                    files: data.files || []
+                }
+            } else {
+                console.error('알 수 없는 응답 구조:', response)
+                throw new Error('알 수 없는 응답 형식입니다.')
             }
 
-            console.log('Processed post data:', postData)
+            console.log('처리된 게시글 데이터:', postData)
+
+            // 게시글 기본 정보 검증
+            if (!postData.post || !postData.post.id) {
+                console.error('게시글 기본 정보가 없습니다:', postData)
+                throw new Error('게시글 정보가 올바르지 않습니다.')
+            }
+
             currentPost.value = postData
+            console.log('currentPost 설정 완료:', currentPost.value)
 
         } catch (err) {
-            console.error('Error fetching post:', err)
+            console.error('=== fetchPostById 오류 ===')
+            console.error('오류 타입:', err.constructor.name)
+            console.error('오류 메시지:', err.message)
+            console.error('HTTP 상태:', err.response?.status)
+            console.error('전체 오류:', err)
 
             if (err.response?.status === 404) {
                 error.value = '게시글을 찾을 수 없습니다.'
@@ -58,6 +106,12 @@ export const usePostStore = defineStore('posts', () => {
             }
         } finally {
             loading.value = false
+            console.log('=== fetchPostById 완료 ===')
+            console.log('최종 상태:', {
+                loading: loading.value,
+                error: error.value,
+                hasPost: !!currentPost.value
+            })
         }
     }
 
@@ -94,12 +148,37 @@ export const usePostStore = defineStore('posts', () => {
         error.value = null
 
         try {
-            console.log('Creating post:', postData)
-            const newPost = await api.posts.create(postData)
-            console.log('Created post:', newPost)
+            console.log('Creating post with data:', postData)
+            const response = await api.posts.create(postData)
+            console.log('Create post API response:', response)
+
+            // 백엔드 응답 구조 확인 및 처리
+            let newPost = null
+
+            if (response.id) {
+                // 직접 게시글 객체가 반환된 경우
+                newPost = response
+            } else if (response.post && response.post.id) {
+                // 래핑된 응답의 경우
+                newPost = response.post
+            } else if (response.data && response.data.id) {
+                // data 래핑된 경우
+                newPost = response.data
+            } else {
+                console.error('Unexpected response structure:', response)
+                throw new Error('게시글 생성 응답 형식이 올바르지 않습니다.')
+            }
+
+            console.log('Processed new post:', newPost)
+
+            if (!newPost.id || isNaN(newPost.id)) {
+                throw new Error('생성된 게시글의 ID가 유효하지 않습니다.')
+            }
 
             // 목록 맨 앞에 추가
             posts.value.unshift(newPost)
+            console.log('Post added to store, new post ID:', newPost.id)
+
             return newPost
         } catch (err) {
             console.error('Error creating post:', err)
