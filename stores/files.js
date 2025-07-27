@@ -1,5 +1,18 @@
 export const useFileStore = defineStore('files', () => {
-    const api = useApi()
+    // API 초기화를 지연시켜 에러 방지
+    let api = null
+
+    const initializeApi = () => {
+        if (!api) {
+            try {
+                api = useApi()
+            } catch (error) {
+                console.error('Failed to initialize API:', error)
+                return null
+            }
+        }
+        return api
+    }
 
     // State
     const files = ref([])
@@ -14,12 +27,18 @@ export const useFileStore = defineStore('files', () => {
             return
         }
 
+        const apiInstance = initializeApi()
+        if (!apiInstance) {
+            error.value = 'API 초기화에 실패했습니다.'
+            return
+        }
+
         loading.value = true
         error.value = null
 
         try {
             console.log('Fetching files for post:', postId)
-            const response = await api.files.getByPostId(postId)
+            const response = await apiInstance.files.getByPostId(postId)
             console.log('Files fetched:', response)
 
             files.value = Array.isArray(response) ? response : []
@@ -41,6 +60,11 @@ export const useFileStore = defineStore('files', () => {
             throw new Error('업로드할 파일이 없습니다.')
         }
 
+        const apiInstance = initializeApi()
+        if (!apiInstance) {
+            throw new Error('API 초기화에 실패했습니다.')
+        }
+
         loading.value = true
         error.value = null
         uploadProgress.value = 0
@@ -60,7 +84,7 @@ export const useFileStore = defineStore('files', () => {
             })
 
             // 파일 업로드 실행
-            const response = await api.files.upload(postId, formData)
+            const response = await apiInstance.files.upload(postId, formData)
             console.log('Upload response:', response)
 
             // 업로드 후 파일 목록 새로고침
@@ -91,12 +115,17 @@ export const useFileStore = defineStore('files', () => {
             throw new Error('파일 ID가 필요합니다.')
         }
 
+        const apiInstance = initializeApi()
+        if (!apiInstance) {
+            throw new Error('API 초기화에 실패했습니다.')
+        }
+
         loading.value = true
         error.value = null
 
         try {
             console.log('Deleting file:', fileId)
-            await api.files.delete(fileId)
+            await apiInstance.files.delete(fileId)
             console.log('File deleted successfully')
 
             // 로컬 상태에서 파일 제거
@@ -121,6 +150,11 @@ export const useFileStore = defineStore('files', () => {
             throw new Error('삭제할 파일이 없습니다.')
         }
 
+        const apiInstance = initializeApi()
+        if (!apiInstance) {
+            throw new Error('API 초기화에 실패했습니다.')
+        }
+
         loading.value = true
         error.value = null
 
@@ -128,7 +162,7 @@ export const useFileStore = defineStore('files', () => {
             console.log('Deleting multiple files:', fileIds)
 
             // 병렬로 삭제 처리
-            const deletePromises = fileIds.map(fileId => api.files.delete(fileId))
+            const deletePromises = fileIds.map(fileId => apiInstance.files.delete(fileId))
             await Promise.all(deletePromises)
 
             console.log('Multiple files deleted successfully')
@@ -155,7 +189,14 @@ export const useFileStore = defineStore('files', () => {
             console.warn('getDownloadUrl: storedName is required')
             return ''
         }
-        return api.files.getDownloadUrl(storedName)
+
+        const apiInstance = initializeApi()
+        if (!apiInstance) {
+            console.error('Cannot get download URL: API not initialized')
+            return ''
+        }
+
+        return apiInstance.files.getDownloadUrl(storedName)
     }
 
     const validateFile = (file, options = {}) => {
@@ -227,8 +268,8 @@ export const useFileStore = defineStore('files', () => {
             bmp: 'image', svg: 'image', webp: 'image',
 
             // 문서
-            pdf: 'document', doc: 'document', docx: 'document',
-            txt: 'document', rtf: 'document', odt: 'document',
+            pdf: 'pdf', doc: 'document', docx: 'document',
+            txt: 'text', rtf: 'document', odt: 'document',
 
             // 스프레드시트
             xls: 'spreadsheet', xlsx: 'spreadsheet', csv: 'spreadsheet', ods: 'spreadsheet',

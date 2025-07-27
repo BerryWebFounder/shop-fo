@@ -49,21 +49,15 @@
           <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm text-gray-500 border-b pb-4 space-y-2 sm:space-y-0">
             <div class="flex flex-wrap items-center gap-4">
               <span class="flex items-center">
-                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
-                </svg>
+                <Icon name="user" size="sm" class="mr-1" />
                 {{ currentPost.post.author }}
               </span>
               <span class="flex items-center">
-                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
-                </svg>
+                <Icon name="calendar" size="sm" class="mr-1" />
                 {{ formatDate(currentPost.post.createdAt) }}
               </span>
               <span v-if="currentPost.post.updatedAt !== currentPost.post.createdAt" class="flex items-center">
-                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
+                <Icon name="edit" size="sm" class="mr-1" />
                 수정됨: {{ formatDate(currentPost.post.updatedAt) }}
               </span>
             </div>
@@ -72,9 +66,7 @@
                   :to="`/posts/${currentPost.post.id}/edit`"
                   class="text-blue-600 hover:text-blue-800 flex items-center px-2 py-1 rounded hover:bg-blue-50"
               >
-                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
+                <Icon name="edit" size="sm" class="mr-1" />
                 수정
               </NuxtLink>
               <button
@@ -82,10 +74,7 @@
                   class="text-red-600 hover:text-red-800 flex items-center px-2 py-1 rounded hover:bg-red-50"
                   :disabled="deleting"
               >
-                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd" />
-                  <path fill-rule="evenodd" d="M4 5a1 1 0 011-1h10a1 1 0 110 2H6v9a2 2 0 002 2h4a2 2 0 002-2V6h1a1 1 0 110-2H5a1 1 0 01-1 1zM8 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
-                </svg>
+                <Icon name="delete" size="sm" class="mr-1" />
                 {{ deleting ? '삭제 중...' : '삭제' }}
               </button>
             </div>
@@ -102,34 +91,26 @@
         <!-- 통계 정보 -->
         <div class="flex flex-wrap items-center gap-6 text-sm text-gray-500 border-t pt-4">
           <span class="flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
-            </svg>
+            <Icon name="message" size="sm" class="mr-1" />
             댓글 {{ currentPost.commentCount || 0 }}개
           </span>
           <span class="flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd" />
-            </svg>
+            <Icon name="attachment" size="sm" class="mr-1" />
             첨부파일 {{ currentPost.fileCount || 0 }}개
           </span>
           <span class="flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-              <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
-            </svg>
+            <Icon name="eye" size="sm" class="mr-1" />
             조회 {{ currentPost.post.viewCount || 0 }}회
           </span>
         </div>
       </article>
 
-      <!-- 첨부파일 섹션 (파일이 있을 때만 표시) -->
+      <!-- 첨부파일 섹션 -->
       <div v-if="hasFiles" class="card mb-8">
         <Suspense>
-          <!-- 읽기 전용 파일 목록 사용 -->
           <FileListReadonly
               :post-id="postId"
-              :can-delete="true"
+              :can-delete="false"
               @file-deleted="handleFileDeleted"
               @file-previewed="handleFilePreview"
           />
@@ -140,6 +121,14 @@
             </div>
           </template>
         </Suspense>
+      </div>
+
+      <!-- 파일 미리보기 모달 -->
+      <div v-if="previewingFile">
+        <FilePreview
+            :file="previewingFile"
+            @close="closeFilePreview"
+        />
       </div>
 
       <!-- 댓글 섹션 -->
@@ -158,9 +147,7 @@
       <!-- 네비게이션 버튼 -->
       <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
         <NuxtLink to="/" class="btn-secondary flex items-center w-full sm:w-auto justify-center">
-          <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-          </svg>
+          <Icon name="arrow-left" size="sm" class="mr-2" />
           목록으로
         </NuxtLink>
 
@@ -168,9 +155,7 @@
             :to="`/posts/${currentPost.post.id}/edit`"
             class="btn-primary flex items-center w-full sm:w-auto justify-center"
         >
-          <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-          </svg>
+          <Icon name="edit" size="sm" class="mr-2" />
           수정하기
         </NuxtLink>
       </div>
@@ -197,6 +182,7 @@ try {
 
 // 상태
 const deleting = ref(false)
+const previewingFile = ref(null)
 
 // 게시글 ID 추출 및 검증
 const postId = computed(() => {
@@ -249,7 +235,7 @@ const { loading } = storeToRefs(postStore)
 const fileStore = useFileStore()
 const { files: attachedFiles } = storeToRefs(fileStore)
 
-// 첨부파일 표시 여부 (실제 파일이 있을 때만)
+// 첨부파일 표시 여부
 const hasFiles = computed(() => {
   // 1. 게시글 데이터에서 파일 개수 확인
   const fileCountFromPost = currentPost.value?.fileCount > 0
@@ -257,21 +243,25 @@ const hasFiles = computed(() => {
   // 2. 파일 store에서 실제 파일 확인
   const hasActualFiles = attachedFiles.value && attachedFiles.value.length > 0
 
-  // 3. 둘 중 하나라도 true면 파일이 있다고 판단
   return fileCountFromPost || hasActualFiles
 })
 
 // 파일 관련 이벤트 핸들러
 const handleFileDeleted = (fileId) => {
   console.log('File deleted:', fileId)
-  // 파일이 삭제되면 hasFiles 재계산을 위해 파일 목록 새로고침
-  // (FileListReadonly 컴포넌트에서 자동으로 처리됨)
+  // 파일이 삭제되면 게시글 정보도 업데이트
+  if (currentPost.value) {
+    currentPost.value.fileCount = Math.max(0, (currentPost.value.fileCount || 0) - 1)
+  }
 }
 
 const handleFilePreview = (file) => {
   console.log('Preview file:', file.originalName)
-  // 파일 미리보기 모달 표시 로직
-  // 필요시 FilePreview 컴포넌트 사용
+  previewingFile.value = file
+}
+
+const closeFilePreview = () => {
+  previewingFile.value = null
 }
 
 // 데이터 재시도
@@ -324,11 +314,28 @@ const formatDate = (dateString) => {
   }
 }
 
-// 라우트 변경 감지 (디버깅)
+// 라우트 변경 감지
 watch(() => route.params.id, (newId, oldId) => {
   console.log('Route param changed:', { from: oldId, to: newId })
   if (newId !== oldId) {
     refresh()
+  }
+})
+
+// 페이지 진입 시 파일 목록도 미리 로드
+onMounted(async () => {
+  console.log('Component mounted')
+  console.log('Current route:', route.fullPath)
+  console.log('Post ID:', postId.value)
+  console.log('Current post data:', currentPost.value)
+
+  // 파일 목록 미리 로드
+  if (postId.value) {
+    try {
+      await fileStore.fetchFilesByPostId(postId.value)
+    } catch (error) {
+      console.warn('Failed to preload files:', error)
+    }
   }
 })
 
@@ -351,14 +358,6 @@ useHead({
       })
     }
   ]
-})
-
-// 디버깅 정보 출력
-onMounted(() => {
-  console.log('Component mounted')
-  console.log('Current route:', route.fullPath)
-  console.log('Post ID:', postId.value)
-  console.log('Current post data:', currentPost.value)
 })
 </script>
 
