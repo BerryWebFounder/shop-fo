@@ -96,9 +96,14 @@ export const useApi = () => {
     })
 
     return {
-        // 게시글 API
+        // 게시글 API (개선됨 - 공지사항 지원)
         posts: {
+            // 일반 게시글만 조회 (공지사항 제외)
             getAll: (params = {}) => api('/posts', { params }),
+
+            // 전체 게시글 조회 (공지사항 + 일반 게시글)
+            getAllWithNotices: (params = {}) => api('/posts/all', { params }),
+
             getById: (id) => {
                 console.log('Getting post by ID:', id)
                 return api(`/posts/${id}`)
@@ -107,24 +112,107 @@ export const useApi = () => {
             update: (id, data) => api(`/posts/${id}`, { method: 'PUT', body: data }),
             delete: (id) => api(`/posts/${id}`, { method: 'DELETE' }),
             search: (params) => api('/posts/search', { params }),
-            getStats: () => api('/posts/stats')
+            getStats: () => api('/posts/stats'),
+            getWithFiles: (params = {}) => api('/posts/with-files', { params })
         },
 
-        // 댓글 API
+        // 공지사항 전용 API (새로 추가)
+        notices: {
+            // 기본 CRUD
+            getAll: (params = {}) => api('/notices', { params }),
+            getActive: (params = {}) => api('/notices/active', { params }),
+            getPinned: () => api('/notices/pinned'),
+            getRegular: () => api('/notices/regular'),
+            getById: (id) => {
+                console.log('Getting notice by ID:', id)
+                return api(`/notices/${id}`)
+            },
+            create: (data) => {
+                console.log('Creating notice:', data)
+                return api('/notices', { method: 'POST', body: data })
+            },
+            update: (id, data) => {
+                console.log('Updating notice:', id, data)
+                return api(`/notices/${id}`, { method: 'PUT', body: data })
+            },
+            delete: (id) => {
+                console.log('Deleting notice:', id)
+                return api(`/notices/${id}`, { method: 'DELETE' })
+            },
+
+            // 상태 관리
+            toggleStatus: (id) => api(`/notices/${id}/toggle-status`, { method: 'PATCH' }),
+
+            // 검색
+            search: (params) => api('/notices/search', { params }),
+
+            // 통계
+            getStats: () => api('/notices/stats'),
+
+            // 특수 조회
+            getExpiringSoon: () => api('/notices/expiring-soon'),
+
+            // 메인 페이지용 (제한된 개수)
+            getForMainPage: () => api('/notices/active').then(response => {
+                // 메인 페이지에는 최대 5개만 표시
+                const notices = Array.isArray(response) ? response : response.content || []
+                return notices.slice(0, 5)
+            })
+        },
+
+        // 관리자 API (새로 추가)
+        admin: {
+            notices: {
+                getAll: (params = {}) => api('/admin/notices/all', { params }),
+                getInactive: (params = {}) => api('/admin/notices/inactive', { params }),
+                getExpired: () => api('/admin/notices/expired'),
+
+                // 일괄 처리
+                batchUpdateStatus: (data) => api('/admin/notices/batch-status', {
+                    method: 'PATCH',
+                    body: data
+                }),
+                batchDelete: (data) => api('/admin/notices/batch-delete', {
+                    method: 'DELETE',
+                    body: data
+                }),
+
+                // 관리 기능
+                cleanupExpired: () => api('/admin/notices/cleanup-expired', { method: 'POST' }),
+                resendNotification: (id) => api(`/admin/notices/${id}/resend-notification`, {
+                    method: 'POST'
+                }),
+
+                // 상세 통계
+                getDetailedStats: () => api('/admin/notices/detailed-stats'),
+                getConfig: () => api('/admin/notices/config')
+            }
+        },
+
+        // 댓글 API (기존 유지)
         comments: {
             getByPostId: (postId) => api(`/comments/post/${postId}`),
+            getByNoticeId: (noticeId) => api(`/comments/notice/${noticeId}`), // 공지사항용 추가
             create: (data) => api('/comments', { method: 'POST', body: data }),
             update: (id, data) => api(`/comments/${id}`, { method: 'PUT', body: data }),
             delete: (id) => api(`/comments/${id}`, { method: 'DELETE' })
         },
 
-        // 파일 API (개선됨)
+        // 파일 API (공지사항 지원 강화)
         files: {
+            // 일반 게시글 파일
             getByPostId: (postId) => {
                 console.log('Fetching files for post:', postId)
                 return api(`/files/post/${postId}`)
             },
 
+            // 공지사항 파일 (새로 추가)
+            getByNoticeId: (noticeId) => {
+                console.log('Fetching files for notice:', noticeId)
+                return api(`/files/notice/${noticeId}`)
+            },
+
+            // 파일 업로드 (일반 게시글)
             upload: async (postId, formData) => {
                 console.log('Uploading files to post:', postId)
                 console.log('FormData entries:', Array.from(formData.entries()).map(([key, value]) =>
@@ -144,10 +232,27 @@ export const useApi = () => {
                 }
             },
 
+            // 공지사항 파일 업로드 (새로 추가)
+            uploadToNotice: async (noticeId, formData) => {
+                console.log('Uploading files to notice:', noticeId)
+
+                try {
+                    const response = await fileApi(`/files/upload/notice/${noticeId}`, {
+                        method: 'POST',
+                        body: formData
+                    })
+                    console.log('Notice file upload successful:', response)
+                    return response
+                } catch (error) {
+                    console.error('Notice file upload failed:', error)
+                    throw error
+                }
+            },
+
             uploadSingle: async (postId, file) => {
                 const formData = new FormData()
                 formData.append('file', file)
-                return await files.upload(postId, formData)
+                return await this.upload(postId, formData)
             },
 
             delete: (id) => {
@@ -170,10 +275,114 @@ export const useApi = () => {
             })
         },
 
+        // 모니터링 API (새로 추가)
+        monitoring: {
+            // Actuator 엔드포인트
+            health: () => api('/actuator/health'),
+            noticeStats: () => api('/actuator/notice-stats'),
+            metrics: () => api('/actuator/metrics'),
+
+            // 커스텀 모니터링
+            getSystemStatus: async () => {
+                try {
+                    const [health, stats, postStats] = await Promise.all([
+                        api('/actuator/health'),
+                        api('/actuator/notice-stats'),
+                        api('/posts/stats')
+                    ])
+
+                    return {
+                        health,
+                        noticeStats: stats,
+                        postStats,
+                        timestamp: new Date().toISOString()
+                    }
+                } catch (error) {
+                    console.error('System status check failed:', error)
+                    return {
+                        error: error.message,
+                        timestamp: new Date().toISOString()
+                    }
+                }
+            }
+        },
+
         // 공통 유틸리티
         utils: {
             ping: () => api('/health'),
-            getServerInfo: () => api('/info')
+            getServerInfo: () => api('/info'),
+
+            // 공지사항 유효성 검증 (클라이언트 사이드)
+            validateNotice: (noticeData) => {
+                const errors = []
+
+                if (!noticeData.title || noticeData.title.trim().length === 0) {
+                    errors.push('제목은 필수입니다.')
+                }
+
+                if (noticeData.title && noticeData.title.length > 200) {
+                    errors.push('제목은 200자를 초과할 수 없습니다.')
+                }
+
+                if (!noticeData.content || noticeData.content.trim().length === 0) {
+                    errors.push('내용은 필수입니다.')
+                }
+
+                if (noticeData.content && noticeData.content.length > 10000) {
+                    errors.push('내용은 10,000자를 초과할 수 없습니다.')
+                }
+
+                if (!noticeData.author || noticeData.author.trim().length === 0) {
+                    errors.push('작성자는 필수입니다.')
+                }
+
+                if (noticeData.expiryDate) {
+                    const expiryDate = new Date(noticeData.expiryDate)
+                    if (expiryDate <= new Date()) {
+                        errors.push('만료일은 현재 시간보다 미래여야 합니다.')
+                    }
+                }
+
+                return {
+                    valid: errors.length === 0,
+                    errors
+                }
+            },
+
+            // 공지사항 타입 확인
+            isNotice: (post) => {
+                return post && post.isNotice === true
+            },
+
+            // 중요 공지사항 확인
+            isPinnedNotice: (post) => {
+                return post && post.isNotice === true && post.isPinned === true
+            },
+
+            // 활성 공지사항 확인
+            isActiveNotice: (post) => {
+                return post && post.isNotice === true && post.isActive === true
+            },
+
+            // 만료된 공지사항 확인
+            isExpiredNotice: (post) => {
+                if (!post || !post.isNotice || !post.expiryDate) {
+                    return false
+                }
+                return new Date(post.expiryDate) <= new Date()
+            },
+
+            // 만료 임박 공지사항 확인 (3일 이내)
+            isExpiringSoon: (post, days = 3) => {
+                if (!post || !post.isNotice || !post.expiryDate) {
+                    return false
+                }
+                const expiryDate = new Date(post.expiryDate)
+                const warningDate = new Date()
+                warningDate.setDate(warningDate.getDate() + days)
+
+                return expiryDate <= warningDate && expiryDate > new Date()
+            }
         }
     }
 }
