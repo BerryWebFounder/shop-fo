@@ -1,5 +1,46 @@
 <template>
   <div>
+    <!-- 공지사항/게시글 전환 탭 -->
+    <div class="mb-6">
+      <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+          <button
+              @click="setViewMode('all')"
+              :class="[
+                'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                viewMode === 'all'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ]"
+          >
+            전체 (공지사항 + 게시글)
+          </button>
+          <button
+              @click="setViewMode('notices')"
+              :class="[
+                'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                viewMode === 'notices'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ]"
+          >
+            공지사항만 ({{ noticeCount }}개)
+          </button>
+          <button
+              @click="setViewMode('posts')"
+              :class="[
+                'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                viewMode === 'posts'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ]"
+          >
+            일반 게시글만 ({{ regularPostCount }}개)
+          </button>
+        </nav>
+      </div>
+    </div>
+
     <!-- 깔끔한 검색 바 -->
     <div class="bg-white rounded-lg shadow-sm border p-4 mb-6">
       <div class="flex gap-2 items-center">
@@ -47,7 +88,7 @@
         </div>
       </div>
 
-      <!-- 검색 결과 요약 (더 컴팩트하게) -->
+      <!-- 검색 결과 요약 -->
       <div v-if="currentSearchInfo" class="mt-3 pt-3 border-t border-gray-100">
         <div class="flex items-center justify-between text-sm">
           <span class="text-gray-600">
@@ -66,28 +107,79 @@
 
     <div v-else-if="error" class="card text-center py-8">
       <p class="text-red-600 mb-4">{{ error }}</p>
-      <button @click="fetchPosts" class="btn-primary">다시 시도</button>
+      <button @click="fetchData" class="btn-primary">다시 시도</button>
     </div>
 
     <div v-else>
-      <div v-if="posts.length > 0" class="space-y-4 mb-8">
-        <PostCard
-            v-for="post in posts"
-            :key="post.id"
-            :post="post"
-            @delete="handleDeletePost"
-        />
+      <!-- 중요 공지사항 (항상 최상단) -->
+      <div v-if="pinnedNotices.length > 0 && (viewMode === 'all' || viewMode === 'notices')" class="mb-6">
+        <div class="flex items-center mb-4">
+          <div class="flex items-center space-x-2">
+            <Icon name="warning" size="sm" color="red" />
+            <h2 class="text-lg font-semibold text-red-800">중요 공지사항</h2>
+          </div>
+        </div>
+        <div class="space-y-3">
+          <PostCard
+              v-for="notice in pinnedNotices"
+              :key="`pinned-${notice.id}`"
+              :post="notice"
+              @delete="handleDeletePost"
+          />
+        </div>
       </div>
 
-      <div v-else class="card text-center py-12">
+      <!-- 일반 공지사항 -->
+      <div v-if="regularNotices.length > 0 && (viewMode === 'all' || viewMode === 'notices')" class="mb-6">
+        <div class="flex items-center mb-4">
+          <div class="flex items-center space-x-2">
+            <Icon name="info" size="sm" color="blue" />
+            <h2 class="text-lg font-semibold text-blue-800">공지사항</h2>
+          </div>
+        </div>
+        <div class="space-y-3">
+          <PostCard
+              v-for="notice in regularNotices"
+              :key="`notice-${notice.id}`"
+              :post="notice"
+              @delete="handleDeletePost"
+          />
+        </div>
+      </div>
+
+      <!-- 일반 게시글 -->
+      <div v-if="displayedPosts.length > 0">
+        <div v-if="viewMode === 'all' && (pinnedNotices.length > 0 || regularNotices.length > 0)" class="flex items-center mb-4">
+          <div class="flex items-center space-x-2">
+            <Icon name="file" size="sm" color="gray" />
+            <h2 class="text-lg font-semibold text-gray-700">일반 게시글</h2>
+          </div>
+        </div>
+
+        <div class="space-y-4 mb-8">
+          <PostCard
+              v-for="post in displayedPosts"
+              :key="`post-${post.id}`"
+              :post="post"
+              @delete="handleDeletePost"
+          />
+        </div>
+      </div>
+
+      <!-- 빈 상태 -->
+      <div v-if="allDisplayedPosts.length === 0" class="card text-center py-12">
         <div v-if="isSearching">
+          <Icon name="search" size="xl" color="gray" class="mx-auto mb-4" />
           <p class="text-gray-500 mb-4">검색 결과가 없습니다.</p>
           <button @click="resetSearch" class="btn-secondary mb-2">전체 목록 보기</button>
         </div>
         <div v-else>
-          <p class="text-gray-500 mb-4">게시글이 없습니다.</p>
+          <Icon name="file" size="xl" color="gray" class="mx-auto mb-4" />
+          <p class="text-gray-500 mb-4">
+            {{ getEmptyMessage() }}
+          </p>
           <NuxtLink to="/posts/create" class="btn-primary">
-            첫 게시글 작성하기
+            {{ getCreateButtonText() }}
           </NuxtLink>
         </div>
       </div>
@@ -98,7 +190,7 @@
           <button
               @click="goToPage(pagination.page - 1)"
               :disabled="pagination.page === 0"
-              class="px-3 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-3 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
           >
             이전
           </button>
@@ -108,7 +200,7 @@
               :key="page"
               @click="goToPage(page - 1)"
               :class="[
-              'px-3 py-2 border rounded-lg',
+              'px-3 py-2 border rounded-lg transition-colors',
               pagination.page === page - 1
                 ? 'bg-blue-600 text-white border-blue-600'
                 : 'hover:bg-gray-50'
@@ -120,7 +212,7 @@
           <button
               @click="goToPage(pagination.page + 1)"
               :disabled="pagination.page >= pagination.totalPages - 1"
-              class="px-3 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-3 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
           >
             다음
           </button>
@@ -134,125 +226,49 @@
 const router = useRouter()
 const modalStore = useModalStore()
 const postStore = usePostStore()
-const { posts, loading, error, pagination } = storeToRefs(postStore)
+const { currentPosts, loading, error, pagination, pinnedNotices, regularNotices, noticePosts, regularPosts } = storeToRefs(postStore)
 
-// 검색 관련 상태
+// 상태 관리
 const searchQuery = ref('')
 const searchType = ref('all')
 const currentPage = ref(0)
 const isSearching = ref(false)
 const currentSearchInfo = ref('')
+const viewMode = ref('all') // 'all', 'notices', 'posts'
 
-// 초기 데이터 로드
-await postStore.fetchPosts(currentPage.value)
+// 초기 데이터 로드 (공지사항 포함)
+await postStore.fetchAllPosts(currentPage.value)
 
-// 네비게이션 함수들
-const navigateToPost = (postId) => {
-  router.push(`/posts/${postId}`)
-}
-
-const navigateToEdit = (postId) => {
-  router.push(`/posts/${postId}/edit`)
-}
-
-// 검색 placeholder 동적 변경
-const getSearchPlaceholder = () => {
-  const placeholders = {
-    all: '제목, 내용, 작성자로 검색...',
-    title: '게시글 제목 검색...',
-    content: '내용 키워드 검색...',
-    author: '작성자명 검색...'
+// 계산된 속성들
+const displayedPosts = computed(() => {
+  switch (viewMode.value) {
+    case 'notices':
+      return []
+    case 'posts':
+      return regularPosts.value
+    case 'all':
+    default:
+      return regularPosts.value
   }
-  return placeholders[searchType.value]
-}
+})
 
-// 검색 처리
-const handleSearch = async () => {
-  const query = searchQuery.value.trim()
+const allDisplayedPosts = computed(() => {
+  const posts = []
 
-  if (!query) {
-    await resetSearch()
-    return
+  if (viewMode.value === 'all' || viewMode.value === 'notices') {
+    posts.push(...pinnedNotices.value, ...regularNotices.value)
   }
 
-  try {
-    // 검색 파라미터 구성
-    const searchParams = {}
-
-    if (searchType.value === 'all') {
-      searchParams.keyword = query
-    } else {
-      searchParams[searchType.value] = query
-    }
-
-    await postStore.searchPosts(searchParams, 0)
-    currentPage.value = 0
-    isSearching.value = true
-
-    // 검색 정보 업데이트
-    const typeNames = {
-      all: '전체',
-      title: '제목',
-      content: '내용',
-      author: '작성자'
-    }
-    currentSearchInfo.value = `${typeNames[searchType.value]}에서 "${query}" 검색`
-
-  } catch (error) {
-    console.error('Search error:', error)
-    await modalStore.showError('검색 중 오류가 발생했습니다.')
+  if (viewMode.value === 'all' || viewMode.value === 'posts') {
+    posts.push(...displayedPosts.value)
   }
-}
 
-// 검색 초기화
-const resetSearch = async () => {
-  searchQuery.value = ''
-  searchType.value = 'all'
-  currentPage.value = 0
-  isSearching.value = false
-  currentSearchInfo.value = ''
-  await postStore.fetchPosts(0)
-}
+  return posts
+})
 
-// 페이지 이동
-const goToPage = async (page) => {
-  currentPage.value = page
+const noticeCount = computed(() => noticePosts.value.length)
+const regularPostCount = computed(() => regularPosts.value.length)
 
-  if (isSearching.value && searchQuery.value.trim()) {
-    const searchParams = {}
-    if (searchType.value === 'all') {
-      searchParams.keyword = searchQuery.value.trim()
-    } else {
-      searchParams[searchType.value] = searchQuery.value.trim()
-    }
-    await postStore.searchPosts(searchParams, page)
-  } else {
-    await postStore.fetchPosts(page)
-  }
-}
-
-// 게시글 삭제
-const handleDeletePost = async (postId) => {
-  if (await modalStore.showConfirm('정말 삭제하시겠습니까?')) {
-    try {
-      await postStore.deletePost(postId)
-      // 현재 페이지에 게시글이 없으면 이전 페이지로
-      if (posts.value.length === 0 && currentPage.value > 0) {
-        currentPage.value -= 1
-        await goToPage(currentPage.value)
-      }
-    } catch (error) {
-      await modalStore.showError('게시글 삭제에 실패했습니다.')
-    }
-  }
-}
-
-// 데이터 새로고침
-const fetchPosts = async () => {
-  await postStore.fetchPosts(currentPage.value)
-}
-
-// 보이는 페이지 번호 계산
 const visiblePages = computed(() => {
   const total = pagination.value.totalPages
   const current = pagination.value.page + 1
@@ -269,29 +285,133 @@ const visiblePages = computed(() => {
   return range
 })
 
-// 날짜 포맷팅
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  try {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffTime = Math.abs(now - date)
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+// 메서드들
+const getSearchPlaceholder = () => {
+  const placeholders = {
+    all: '제목, 내용, 작성자로 검색...',
+    title: '게시글 제목 검색...',
+    content: '내용 키워드 검색...',
+    author: '작성자명 검색...'
+  }
+  return placeholders[searchType.value]
+}
 
-    if (diffDays === 1) {
-      return '오늘'
-    } else if (diffDays === 2) {
-      return '어제'
-    } else if (diffDays <= 7) {
-      return `${diffDays - 1}일 전`
+const getEmptyMessage = () => {
+  switch (viewMode.value) {
+    case 'notices':
+      return '공지사항이 없습니다.'
+    case 'posts':
+      return '일반 게시글이 없습니다.'
+    case 'all':
+    default:
+      return '게시글이 없습니다.'
+  }
+}
+
+const getCreateButtonText = () => {
+  switch (viewMode.value) {
+    case 'notices':
+      return '첫 공지사항 작성하기'
+    case 'posts':
+      return '첫 게시글 작성하기'
+    case 'all':
+    default:
+      return '첫 게시글 작성하기'
+  }
+}
+
+const setViewMode = async (mode) => {
+  console.log('View mode changed:', viewMode.value, '→', mode)
+  viewMode.value = mode
+
+  // 검색 중이 아닐 때만 데이터 새로고침
+  if (!isSearching.value) {
+    await fetchData()
+  }
+}
+
+const fetchData = async () => {
+  currentPage.value = 0
+
+  // 항상 전체 데이터를 가져온 후 뷰모드에 따라 필터링
+  await postStore.fetchAllPosts(currentPage.value)
+}
+
+const handleSearch = async () => {
+  const query = searchQuery.value.trim()
+
+  if (!query) {
+    await resetSearch()
+    return
+  }
+
+  try {
+    const searchParams = {}
+
+    if (searchType.value === 'all') {
+      searchParams.keyword = query
     } else {
-      return date.toLocaleDateString('ko-KR', {
-        month: 'short',
-        day: 'numeric'
-      })
+      searchParams[searchType.value] = query
     }
+
+    console.log('Search params:', searchParams)
+
+    await postStore.searchPosts(searchParams, 0)
+    currentPage.value = 0
+    isSearching.value = true
+
+    const typeNames = {
+      all: '전체',
+      title: '제목',
+      content: '내용',
+      author: '작성자'
+    }
+    currentSearchInfo.value = `${typeNames[searchType.value]}에서 "${query}" 검색`
+
   } catch (error) {
-    return dateString
+    console.error('Search error:', error)
+    await modalStore.showError('검색 중 오류가 발생했습니다.')
+  }
+}
+
+const resetSearch = async () => {
+  searchQuery.value = ''
+  searchType.value = 'all'
+  currentPage.value = 0
+  isSearching.value = false
+  currentSearchInfo.value = ''
+  await postStore.fetchAllPosts(0)
+}
+
+const goToPage = async (page) => {
+  currentPage.value = page
+
+  if (isSearching.value && searchQuery.value.trim()) {
+    const searchParams = {}
+    if (searchType.value === 'all') {
+      searchParams.keyword = searchQuery.value.trim()
+    } else {
+      searchParams[searchType.value] = searchQuery.value.trim()
+    }
+    await postStore.searchPosts(searchParams, page)
+  } else {
+    await postStore.fetchAllPosts(page)
+  }
+}
+
+const handleDeletePost = async (postId) => {
+  if (await modalStore.showConfirm('정말 삭제하시겠습니까?')) {
+    try {
+      await postStore.deletePost(postId)
+
+      // 현재 페이지에 게시글이 없으면 이전 페이지로
+      if (allDisplayedPosts.value.length === 0 && currentPage.value > 0) {
+        currentPage.value -= 1
+        await goToPage(currentPage.value)
+      }
+    } catch (error) {
+      await modalStore.showError('게시글 삭제에 실패했습니다.')
+    }
   }
 }
 
@@ -299,13 +419,12 @@ const formatDate = (dateString) => {
 useHead({
   title: '게시판',
   meta: [
-    { name: 'description', content: '깔끔하고 심플한 게시판입니다.' }
+    { name: 'description', content: '공지사항과 게시글을 확인할 수 있는 게시판입니다.' }
   ]
 })
 </script>
 
 <style scoped>
-/* 텍스트 라인 제한 */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -313,95 +432,24 @@ useHead({
   overflow: hidden;
 }
 
-/* 포커스 스타일 */
 input:focus,
 select:focus {
   outline: none;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-/* 그룹 호버 효과 */
-.group:hover .group-hover\:opacity-100 {
-  opacity: 1;
-}
-
-/* 카드 호버 효과 */
-.bg-white:hover .opacity-0 {
-  opacity: 1;
-}
-
-/* 반응형 */
-@media (max-width: 1024px) {
-  .lg\:flex-row {
-    flex-direction: column;
-  }
-
-  .lg\:w-40 {
-    width: 100%;
-  }
-
-  .space-x-3 {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .space-x-3 > * + * {
-    margin-left: 0;
-  }
+.border-b-2 {
+  border-bottom-width: 2px;
 }
 
 @media (max-width: 768px) {
-  .max-w-6xl {
-    max-width: none;
+  .space-x-8 {
+    gap: 1rem;
   }
 
   .px-6 {
     padding-left: 1rem;
     padding-right: 1rem;
-  }
-
-  .text-3xl {
-    font-size: 1.875rem;
-  }
-
-  .py-8 {
-    padding-top: 1.5rem;
-    padding-bottom: 1.5rem;
-  }
-
-  .p-6 {
-    padding: 1rem;
-  }
-
-  .space-y-4 > * + * {
-    margin-top: 1rem;
-  }
-}
-
-@media (max-width: 640px) {
-  .flex.items-center.justify-between {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .btn-primary {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .space-x-4 > * + * {
-    margin-left: 0;
-    margin-top: 0.5rem;
-  }
-
-  .flex.items-center.space-x-4 {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .flex.items-center.space-x-4 > * + * {
-    margin-left: 0;
   }
 }
 </style>
